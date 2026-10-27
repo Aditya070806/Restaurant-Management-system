@@ -19,8 +19,8 @@ def main(conn):
                 else:
                     print("Enter a valid id")
             elif option == 2:
-                cust_name = input("Enter your name:").strip()
-                cust_phone = int(input("Enter your phone no:")).strip()
+                cust_name = input("Enter your name: ").strip()
+                cust_phone = int(input("Enter your phone no: "))
                 if not cust_name:
                     print("Name cannot be empty.")
                     continue
