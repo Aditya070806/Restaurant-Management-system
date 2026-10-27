@@ -2,7 +2,7 @@ import mysql.connector
 
 def main(conn):
     cursor = conn.cursor()
-    print(f"========== RESTAURANT SYSTEM ==========\n1. Existing customer\n2. Register new customer\n")
+    print(f"========== RESTAURANT SYSTEM ==========\n 1. Existing customer\n 2. Register new customer\n")
     while True:
         try:
             option = int(input("Choose an option: "))
@@ -20,7 +20,7 @@ def main(conn):
                     print("Enter a valid id")
             elif option == 2:
                 cust_name = input("Enter your name:").strip()
-                cust_phone = input("Enter your phone no:").strip()
+                cust_phone = int(input("Enter your phone no:")).strip()
                 if not cust_name:
                     print("Name cannot be empty.")
                     continue
