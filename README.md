@@ -249,6 +249,12 @@ python app.py
 
 The application menu provides options to create a new order, view order history, or exit.
 
+### 8. Run Automated Tests
+
+Run the unit test suite (uses `unittest.mock` to test edge cases without modifying your live database):
+```bash
+pytest -v
+```
 ---
 
 ## 🖥️ Example Workflow
