@@ -1,12 +1,13 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 import mysql.connector
 
 import app
 import customers
 import orders
 import order_history
-
+import order_details
+import analytics
 
 # ==========================================
 # FIXTURES: Mock Database & Cursor
@@ -19,18 +20,14 @@ def mock_db():
     conn.cursor.return_value = cursor
     return conn, cursor
 
-
 # ==========================================
 # 1. CUSTOMERS.PY EXTREME CASES
 # ==========================================
 def test_existing_customer_invalid_inputs_then_valid(mock_db, monkeypatch):
     """Tests non-numeric menu option, non-existent ID, then valid ID."""
     conn, cursor = mock_db
-    # First query returns None (ID 999 not found), second returns valid row
     cursor.fetchone.side_effect = [None, (1, "Aditya", "9876543210")]
 
-    # Simulate user typing: "abc" (invalid option) -> "9" (out of range) ->
-    # "1" (existing) -> "999" (not found) -> "1" (existing) -> "1" (valid ID)
     inputs = iter(["abc", "9", "1", "999", "1", "1"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
@@ -46,10 +43,6 @@ def test_register_customer_empty_name_and_bad_phone(mock_db, monkeypatch):
     conn, cursor = mock_db
     cursor.lastrowid = 42
 
-    # Simulate user typing:
-    # 1st attempt: Option "2" -> Name "   " (empty) -> Phone "9876543210" (rejected due to empty name)
-    # 2nd attempt: Option "2" -> Name "Aditya" -> Phone "not_a_number" (raises ValueError)
-    # 3rd attempt: Option "2" -> Name "Aditya" -> Phone "9876543210" (valid)
     inputs = iter([
         "2", "   ", "9876543210",
         "2", "Aditya", "not_a_number",
@@ -62,7 +55,6 @@ def test_register_customer_empty_name_and_bad_phone(mock_db, monkeypatch):
     assert new_id == 42
     conn.commit.assert_called_once()
     cursor.close.assert_called_once()
-
 
 # ==========================================
 # 2. ORDER_HISTORY.PY EXTREME CASES
@@ -78,7 +70,6 @@ def test_order_history_empty_database(mock_db, capsys):
     assert "No Order found" in captured.out
     cursor.close.assert_called_once()
 
-
 def test_order_history_with_null_payments(mock_db, capsys):
     """Tests LEFT JOIN edge case where Payment_method and Payment_status are None."""
     conn, cursor = mock_db
@@ -92,7 +83,6 @@ def test_order_history_with_null_payments(mock_db, capsys):
     assert "Order ID: 101" in captured.out
     assert "Payment: None (None)" in captured.out
     cursor.close.assert_called_once()
-
 
 # ==========================================
 # 3. ORDERS.PY EXTREME & BOUNDARY CASES
@@ -163,7 +153,6 @@ def test_order_extreme_input_validation_and_duplicate_merging(mock_db, monkeypat
     orders.main()
     captured = capsys.readouterr()
 
-    # Verify quantity merging (2 + 3 = 5 Pizzas @ ₹200 = ₹1000.00)
     assert "Pizza x 5 = ₹1000.00" in captured.out
     assert "Total amount: ₹1000.00" in captured.out
     assert "Payment status: Paid" in captured.out
@@ -197,7 +186,6 @@ def test_order_database_crash_triggers_rollback(mock_db, monkeypatch, capsys):
     conn, cursor = mock_db
     cursor.fetchall.return_value = [(1, "Pizza", 200.0, "Veg", "Main")]
 
-    # Simulate a database crash when executemany is called
     cursor.executemany.side_effect = mysql.connector.Error("Simulated Foreign Key Failure")
 
     monkeypatch.setattr(orders, "get_connection", lambda: conn)
@@ -218,13 +206,12 @@ def test_order_database_crash_triggers_rollback(mock_db, monkeypatch, capsys):
     conn.rollback.assert_called()
     conn.close.assert_called_once()
 
-
 # ==========================================
 # 4. APP.PY EXTREME CASES
 # ==========================================
 def test_app_navigation_and_connection_failure(monkeypatch, capsys):
-    """Tests invalid menu inputs in app.py and checks if Option 2 crashes when DB fails."""
-    inputs = iter(["invalid", "99", "3"])
+    """Tests invalid menu inputs in app.py and exits cleanly on Option 5."""
+    inputs = iter(["invalid", "99", "5"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     app.main()
@@ -233,4 +220,170 @@ def test_app_navigation_and_connection_failure(monkeypatch, capsys):
     assert "Use a option" in captured.out
     assert "Invalid Choice" in captured.out
 
-    
+# ==========================================
+# 5. ORDER_DETAILS.PY TESTS
+# ==========================================
+def test_order_details_valid_order(mock_db, monkeypatch, capsys):
+    """Tests displaying details for an existing order."""
+    conn, cursor = mock_db
+
+    cursor.fetchall.return_value = [
+        (
+            101,                       # Order_id
+            "Aditya",                  # Customer_name
+            "2026-10-29 12:00:00",     # Order_date
+            "Pending",                 # Status
+            400.00,                    # Total_amount
+            1,                         # Food_id
+            1001,                      # Order_item_id
+            2,                         # Quantity
+            200.00,                    # Unit_price
+            "Pizza",                   # food_name
+            "UPI",                     # Payment_method
+            "Paid"                     # Payment_status
+        )
+    ]
+
+    monkeypatch.setattr("builtins.input", lambda _: "101")
+
+    order_details.main(conn)
+    captured = capsys.readouterr()
+
+    assert "ORDER DETAILS" in captured.out
+    assert "Order ID" in captured.out
+    assert "101" in captured.out
+    assert "Aditya" in captured.out
+    assert "Pizza" in captured.out
+    assert "UPI" in captured.out
+    assert "Paid" in captured.out
+
+    cursor.execute.assert_called_once()
+    cursor.close.assert_called_once()
+
+
+def test_order_details_nonexistent_order(mock_db, monkeypatch, capsys):
+    """Tests when the requested Order ID does not exist."""
+    conn, cursor = mock_db
+    cursor.fetchall.return_value = []
+
+    monkeypatch.setattr("builtins.input", lambda _: "999")
+
+    order_details.main(conn)
+    captured = capsys.readouterr()
+
+    assert "No order found with this ID." in captured.out or "No record" in captured.out
+
+    cursor.execute.assert_called_once()
+    cursor.close.assert_called_once()
+
+
+def test_order_details_invalid_order_id(mock_db, monkeypatch, capsys):
+    """Tests when the user enters a non-numeric Order ID."""
+    conn, cursor = mock_db
+
+    monkeypatch.setattr("builtins.input", lambda _: "abc")
+
+    order_details.main(conn)
+    captured = capsys.readouterr()
+
+    assert "Please Enter a valid order ID" in captured.out
+
+    cursor.execute.assert_not_called()
+    cursor.close.assert_called_once()
+
+
+def test_order_details_database_error(mock_db, monkeypatch, capsys):
+    """Tests handling a database error while retrieving order details."""
+    conn, cursor = mock_db
+
+    cursor.execute.side_effect = mysql.connector.Error(
+        "Simulated database failure"
+    )
+
+    monkeypatch.setattr("builtins.input", lambda _: "101")
+
+    order_details.main(conn)
+    captured = capsys.readouterr()
+
+    assert "Simulated database failure" in captured.out
+
+    cursor.close.assert_called_once()
+
+# ==========================================
+# 6. ANALYTICS.PY TESTS
+# ==========================================
+def test_analytics_all_reports_with_data(mock_db, monkeypatch, capsys):
+    """Tests all 3 analytics reports (Daily Sales, Top Items, Top Customers) with valid rows."""
+    conn, cursor = mock_db
+
+    cursor.fetchall.side_effect = [
+        # 1. daily_sales: (DATE, Total_Order, Total, Average)
+        [("2026-10-29", 5, 1250.00, 250.00)],
+        # 2. top_selling_item: (food_id, Food_name, Total_quantity, Total_revenue)
+        [(1, "Margherita Pizza", 10, 2500.00)],
+        # 3. top_customer: (Customer_id, Customer_name, Total_order, Total_spend)
+        [(1, "Aditya", 5, 1250.00)]
+    ]
+
+    inputs = iter(["1", "2", "3", "4"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+    analytics.main(conn)
+    captured = capsys.readouterr()
+
+    assert "DAILY SALES REPORT" in captured.out
+    assert "2026-10-29" in captured.out
+    assert "TOP 5 BEST-SELLING ITEMS" in captured.out
+    assert "Margherita Pizza" in captured.out
+    assert "TOP 5 VIP CUSTOMERS" in captured.out
+    assert "Aditya" in captured.out
+    assert cursor.execute.call_count == 3
+    cursor.close.assert_called_once()
+
+
+def test_analytics_empty_data(mock_db, monkeypatch, capsys):
+    """Tests all 3 analytics reports when the database returns empty lists."""
+    conn, cursor = mock_db
+    cursor.fetchall.return_value = []
+
+    inputs = iter(["1", "2", "3", "4"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+    analytics.main(conn)
+    captured = capsys.readouterr()
+
+    assert "No sales data found" in captured.out
+    assert "No item sales found" in captured.out
+    assert "No top customer found" in captured.out
+    assert cursor.execute.call_count == 3
+    cursor.close.assert_called_once()
+
+
+def test_analytics_invalid_menu_inputs(mock_db, monkeypatch, capsys):
+    """Tests non-numeric and out-of-range menu choices in analytics.main()."""
+    conn, cursor = mock_db
+
+    inputs = iter(["abc", "99", "4"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+    analytics.main(conn)
+    captured = capsys.readouterr()
+
+    assert "Enter a valid option" in captured.out
+    assert "Enter a given option" in captured.out
+    cursor.execute.assert_not_called()
+    cursor.close.assert_called_once()
+
+
+def test_analytics_database_error(mock_db, monkeypatch, capsys):
+    """Tests MySQL exception handling inside analytics.main()."""
+    conn, cursor = mock_db
+    cursor.execute.side_effect = mysql.connector.Error("Analytics DB connection lost")
+
+    monkeypatch.setattr("builtins.input", lambda _: "1")
+
+    analytics.main(conn)
+    captured = capsys.readouterr()
+
+    assert "Database Error: Analytics DB connection lost" in captured.out
+    cursor.close.assert_called_once()

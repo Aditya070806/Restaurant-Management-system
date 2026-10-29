@@ -134,7 +134,7 @@ def main():
                 cursor.execute(
                     """INSERT INTO Payments(Order_id, Payment_method, Payment_status)
                         VALUES(%s, %s, %s)""",
-                        (order_id,payee,"Pending")
+                        (order_id,payee.upper(),"Pending")
                 )
                 conn.commit()
                 print("Order and all items saved successfully!")
