@@ -3,11 +3,14 @@ import mysql.connector
 def daily_sales(cursor):
     cursor.execute("""
                 SELECT 
-                    DATE(Order_date) AS DATE,
-                    COUNT(Order_id) AS Total_Order,
-                    SUM(Total_amount) AS Total,
-                    AVG(Total_amount) AS Average
-                FROM Orders
+                    DATE(o.Order_date) AS DATE,
+                    COUNT(o.Order_id) AS Total_Order,
+                    SUM(o.Total_amount) AS Total,
+                    AVG(o.Total_amount) AS Average
+                FROM Orders AS o
+                INNER JOIN Payments AS p
+                    ON o.Order_id=p.p.Order_id
+                WHERE p.Payment_status = 'Paid'
                 GROUP BY DATE(Order_date)
                 ORDER BY DATE(Order_date) DESC"""
         )
@@ -42,6 +45,9 @@ def top_selling_item(cursor):
                 FROM Order_items AS oi
                 INNER JOIN MENU AS m
                     ON m.food_id = oi.food_id
+                INNER JOIN Payments AS p
+                    ON oi.Order_id = p.Order_id
+                WHERE p.Payment_status = 'Paid'
                 GROUP BY m.food_id,m.Food_name
                 ORDER BY Total_quantity DESC
                 LIMIT 5"""
@@ -77,6 +83,9 @@ def top_customer(cursor):
                 FROM Customers AS c
                 INNER JOIN Orders AS o
                 ON c.Customer_id = o.Customer_id
+                INNER JOIN Payments AS p
+                    ON o.Order_id = p.Order_id
+                WHERE p.Payment_status = 'Paid'
                 GROUP BY c.Customer_id,c.Customer_name
                 ORDER BY Total_spend DESC
                 LIMIT 5"""
@@ -102,6 +111,10 @@ def top_customer(cursor):
             f"₹{Total_spend:>14.2f}"
         )
     print("=" * 65 + "\n")
+
+def get_sales(cursor):
+    pass
+
 
 def main(conn):
     cursor = conn.cursor()
