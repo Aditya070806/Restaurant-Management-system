@@ -1,71 +1,70 @@
-# 🍽️ Restaurant Management System
+# Restaurant Management System
 
-A modular, command-line Restaurant Management System built using **Python and MySQL**. The application supports customer management, menu-based order creation, payment-status tracking, and order-history retrieval.
+A modular, command-line Restaurant Management System built with **Python and MySQL**. The application handles customer registration, order creation, payment status tracking, order history lookup, itemized receipt retrieval, and sales analytics with CSV export.
 
-This project demonstrates practical Python programming, relational database design, SQL joins, parameterized queries, database transactions, batch insertions, and environment-variable configuration.
-
-**Project status:** Work in Progress
+It covers practical Python development alongside relational database design, multi-table SQL joins (`INNER JOIN`, `LEFT JOIN`), SQL aggregations (`SUM`, `COUNT`, `AVG`, `GROUP BY`), database transactions (`COMMIT` / `ROLLBACK`), file I/O (`csv`), and unit testing (`pytest` + `unittest.mock`).
 
 ---
 
-## ✨ Features
+## Features
 
-- **Customer Management:** Register new customers or select existing customers using their customer IDs.
-- **Interactive Menu:** Retrieve menu items from MySQL and validate food IDs and quantities.
-- **Order Cart:** Select multiple food items, combine repeated selections, and calculate subtotals and the final order total.
-- **Order Confirmation:** Review an itemized order summary and confirm or cancel before saving the order.
-- **Database Persistence:** Save orders, order items, and payment records to MySQL.
-- **Payment Management:** Record Cash, Card, or UPI as the selected payment method and track pending or paid statuses through a simulated confirmation workflow.
-- **Order History:** Retrieve saved orders and associated payment information using SQL `LEFT JOIN` queries, with the newest orders displayed first.
-- **Order Receipts:** Display order details, itemized totals, payment methods, and saved payment statuses.
-- **Modular Structure:** Separate customer management, order processing, and order-history functionality into individual Python modules.
+- **Customer Management (`customers.py`):** Register new customers or look up existing customers by ID before starting an order.
+- **Interactive Menu & Cart (`orders.py`):** Load menu items from MySQL, validate food IDs and quantities, merge duplicate item selections in the cart, and calculate order totals.
+- **Transactional Order Saving (`orders.py`):** Save orders, line items (`executemany`), and payment records inside a database transaction so incomplete orders roll back cleanly on error.
+- **Payment Tracking (`orders.py`):** Record `Cash`, `Card`, or `UPI` payments and update statuses from `Pending` to `Paid` through a confirmation workflow.
+- **Order History (`order_history.py`):** View past orders with customer details, order status, total amount, and payment status using `LEFT JOIN`, sorted newest first.
+- **Order Details Lookup (`order_details.py`):** Look up any past order by `Order_id` to view its full itemized receipt, customer info, and payment status.
+- **Analytics & CSV Export (`analytics.py`):** Generate reports for **Daily Sales**, **Top 5 Best-Selling Items**, and **Top 5 VIP Customers**. Queries filter for `Paid` orders so pending payments do not skew revenue figures, and any report can be exported to a `.csv` file in the `reports/` directory.
+- **Automated Test Suite (`test_restaurant.py`):** 18 unit tests covering normal workflows, empty states, invalid inputs, database errors, and CSV export using `pytest` and `unittest.mock`.
 
-> **Payment limitation:** This project does not currently integrate a real payment gateway. Payment completion is simulated through user confirmation and is not independently verified against an actual financial transaction.
+> **Note on payments:** Payment completion is simulated through user confirmation in the terminal and does not connect to an external payment gateway.
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 restaurant-management-system/
-├── app.py              # Main entry point and navigation menu
-├── customers.py        # Customer selection and registration
-├── orders.py           # Menu selection, order creation, payments and receipts
-├── order_history.py    # Order and payment history viewer
-├── restaurant.py       # Standalone menu viewer utility
-├── requirements.txt    # Python dependencies
-├── .env.example        # Example environment configuration
-├── .gitignore          # Files excluded from Git
-└── README.md           # Project documentation
+├── app.py               # Main entry point and navigation menu
+├── customers.py         # Customer lookup and registration
+├── orders.py            # Menu display, cart logic, payments, and receipts
+├── order_history.py     # Order and payment history viewer
+├── order_details.py     # Itemized receipt lookup by Order ID
+├── analytics.py         # Sales, item, and customer analytics with CSV export
+├── restaurant.py        # Standalone menu viewer utility
+├── test_restaurant.py   # Automated unit test suite (18 tests)
+├── requirements.txt     # Python dependencies
+├── .env.example         # Example environment variable configuration
+├── .gitignore           # Ignored files and directories (.env, .venv, reports/)
+└── README.md            # Project documentation
 ```
 
-The `.env` and `.venv` files are created locally and should not be committed to GitHub.
+The `.env`, `.venv`, and generated `reports/` files are kept local and excluded from Git via `.gitignore`.
 
 ---
 
-## 🛠️ Built With
+## Built With
 
-- **Python** — application logic and command-line interface
-- **MySQL** — relational database management
-- **mysql-connector-python** — MySQL connectivity from Python
-- **python-dotenv** — loading database configuration from environment variables
-- **DBeaver** — database exploration and SQL development
+- **Python** — CLI application logic, CSV file handling, and input validation
+- **MySQL** — Relational database storage and aggregation queries
+- **mysql-connector-python** — MySQL driver for Python
+- **python-dotenv** — Environment variable management for database credentials
+- **pytest & unittest.mock** — Unit testing without requiring a live database connection
+- **DBeaver** — Database inspection and SQL query testing
 
 ---
 
-## 🗄️ Database Schema
+## Database Schema
 
-The application uses five related tables:
+The application uses five related tables in the `restaurants_db` database:
 
 | Table | Purpose |
 |---|---|
-| `MENU` | Stores available food items, prices, types, and courses |
-| `Customers` | Stores customer information |
-| `Orders` | Stores order details, dates, statuses, and totals |
-| `Order_items` | Stores individual food items belonging to each order |
-| `Payments` | Stores payment methods and payment statuses |
-
-The following schema reflects the column structure used by the application.
+| `MENU` | Food items, prices, types, and courses |
+| `Customers` | Customer contact records |
+| `Orders` | Order headers, timestamps, statuses, and total amounts |
+| `Order_items` | Individual line items and historical unit prices for each order |
+| `Payments` | Payment methods and payment statuses (`Pending` / `Paid`) |
 
 ### Create the database
 
@@ -79,10 +78,10 @@ USE restaurants_db;
 ```sql
 CREATE TABLE MENU (
     food_id INT NOT NULL AUTO_INCREMENT,
-    name VARCHAR(100) NOT NULL,
-    price DECIMAL(6,2) NOT NULL,
-    type VARCHAR(10),
-    course VARCHAR(50),
+    Food_name VARCHAR(100) NOT NULL,
+    Price DECIMAL(6,2) NOT NULL,
+    Type VARCHAR(10),
+    Category VARCHAR(50),
     PRIMARY KEY (food_id)
 );
 ```
@@ -121,18 +120,18 @@ CREATE TABLE Orders (
 CREATE TABLE Order_items (
     Order_item_id INT NOT NULL AUTO_INCREMENT,
     Order_id INT NOT NULL,
-    Food_id INT NOT NULL,
-    Quantity INT NOT NULL CHECK (Quantity > 0),
+    food_id INT NOT NULL,
+    quantity INT NOT NULL CHECK (quantity > 0),
     unit_price DECIMAL(8,2) NOT NULL,
     PRIMARY KEY (Order_item_id),
     FOREIGN KEY (Order_id)
         REFERENCES Orders(Order_id),
-    FOREIGN KEY (Food_id)
+    FOREIGN KEY (food_id)
         REFERENCES MENU(food_id)
 );
 ```
 
-The `unit_price` column stores the price associated with an item when the order is placed. This helps preserve the historical order value if menu prices change later.
+`unit_price` records the item's price at the moment the order was placed so historical receipts and revenue analytics remain accurate if menu prices change later.
 
 ### 5. Payments
 
@@ -150,10 +149,10 @@ CREATE TABLE Payments (
 
 ### Sample menu data
 
-The application expects menu items to exist before an order can be placed. The following records provide sample data for a new installation; adapt them to your preferred menu.
+Insert sample menu items before creating your first order:
 
 ```sql
-INSERT INTO MENU (name, price, type, course)
+INSERT INTO MENU (Food_name, Price, Type, Category)
 VALUES
     ('Paneer Tikka', 220.00, 'Veg', 'Starter'),
     ('Chicken Biryani', 280.00, 'Non-Veg', 'Main Course'),
@@ -161,32 +160,24 @@ VALUES
     ('Soft Drink', 60.00, 'Veg', 'Beverage');
 ```
 
-If your database and tables already exist, **do not run the `CREATE TABLE` statements again**. Use this section as a reference for the expected schema.
-
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### 1. Prerequisites
 
-Install the following:
-
-- Python
+- Python 3
 - MySQL Server
 - Git
-
-DBeaver is optional but useful for inspecting tables and running SQL queries.
 
 ### 2. Clone the repository
 
 ```bash
-git clone https://github.com/Aditya070806/Restaurant-Management-system.git
+git clone [https://github.com/Aditya070806/Restaurant-Management-system.git](https://github.com/Aditya070806/Restaurant-Management-system.git)
 cd Restaurant-Management-system
 ```
 
-### 3. Create a virtual environment
-
-On Ubuntu or another Linux distribution:
+### 3. Create and activate a virtual environment
 
 ```bash
 python3 -m venv .venv
@@ -195,32 +186,25 @@ source .venv/bin/activate
 
 ### 4. Install dependencies
 
-Install the packages listed in `requirements.txt`:
-
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-The application requires:
-
-- `mysql-connector-python`
-- `python-dotenv`
-
-If either package is missing from `requirements.txt`, install it with:
+Or install the packages directly:
 
 ```bash
-python -m pip install mysql-connector-python python-dotenv
+python -m pip install mysql-connector-python python-dotenv pytest
 ```
 
 ### 5. Configure environment variables
 
-Copy the example configuration:
+Copy the example file and add your MySQL credentials:
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and supply your local MySQL connection details:
+Update `.env`:
 
 ```env
 DB_HOST=localhost
@@ -229,119 +213,56 @@ DB_PASSWORD=your_mysql_password
 DB_NAME=restaurants_db
 ```
 
-Replace the example values with your own credentials.
-
-**Security:** Never commit your actual `.env` file or database password to GitHub. Ensure `.env` is included in `.gitignore`.
-
-### 6. Set up the database
-
-Create the `restaurants_db` database and the required tables using the schema above, or use your existing database if it already matches the application's expected structure.
-
-Add menu records before testing order creation.
-
-### 7. Run the application
-
-Start the main application from the project directory:
+### 6. Run the application
 
 ```bash
-python app.py
+python3 app.py
 ```
 
-The application menu provides options to create a new order, view order history, or exit.
+### 7. Run automated tests
 
-### 8. Run Automated Tests
+The test suite mocks the database connection and user input, so it runs without touching your live MySQL data:
 
-Run the unit test suite (uses `unittest.mock` to test edge cases without modifying your live database):
 ```bash
 pytest -v
 ```
+
 ---
 
-## 🖥️ Example Workflow
-
-A typical order follows this sequence:
+## Example Workflow
 
 ```text
 ========== RESTAURANT MANAGEMENT SYSTEM ==========
 
 1. Create a new order
 2. View order history
-3. Exit
-
-        ↓
-
-Select or register a customer
-        ↓
-Choose menu items and quantities
-        ↓
-Review the order summary
-        ↓
-Confirm or cancel the order
-        ↓
-Select a payment method
-        ↓
-Save the order, items and pending payment
-        ↓
-Optionally simulate payment completion
-        ↓
-Display the final receipt
+3. View Order details
+4. Analytics & Reports
+5. Exit
 ```
 
-### Example receipt
-
-The following output is illustrative. IDs, menu items, totals, and payment statuses depend on the data in your database.
-
-```text
-========== RESTAURANT RECEIPT ==========
-
-Order ID: 12
-Customer ID: 5
-----------------------------------------
-Paneer Tikka x 2       = ₹440.00
-Chocolate Brownie x 1  = ₹120.00
-----------------------------------------
-Total: ₹560.00
-Payment method: UPI
-Payment status: Paid
-========================================
-Thank you for your order!
-```
+- **Option 1 (Create a new order):** Select or register a customer $\rightarrow$ pick menu items and quantities $\rightarrow$ confirm order summary $\rightarrow$ choose payment method (`Cash`, `Card`, `UPI`) $\rightarrow$ confirm payment status $\rightarrow$ print receipt.
+- **Option 2 (View order history):** Display a formatted table of all orders with customer names, dates, totals, and payment statuses.
+- **Option 3 (View Order details):** Enter an `Order_id` to retrieve the itemized breakdown and payment details for that order.
+- **Option 4 (Analytics & Reports):** View **Daily Sales**, **Top 5 Best-Selling Items**, or **Top 5 VIP Customers**, and optionally export the results to `reports/*.csv`.
 
 ---
 
-## 🔍 SQL Concepts Demonstrated
+## SQL & Python Concepts Used
 
-This project provides practical experience with:
-
-- **Parameterized queries:** Passing values separately from SQL statements.
-- **Joins:** Combining order and payment information using `LEFT JOIN`.
-- **Aggregate calculations in Python:** Computing line subtotals and order totals.
-- **Transactions:** Saving an order and its items together using `COMMIT` and `ROLLBACK`.
-- **Batch insertions:** Using `cursor.executemany()` to insert multiple order items.
-- **Foreign keys:** Connecting customers, orders, menu items, and payments through relational constraints.
-- **Sorting:** Displaying the newest orders first using `ORDER BY ... DESC`.
+- **Parameterized queries (`%s`):** Prevents SQL injection by passing values separately from SQL statements.
+- **Multi-table joins:** Combines data across `Orders`, `Customers`, `Order_items`, `MENU`, and `Payments` using `INNER JOIN` and `LEFT JOIN`.
+- **SQL aggregations:** Computes daily revenue, order counts, average order value, item quantities sold, and top customer spend using `COUNT()`, `SUM()`, `AVG()`, and `GROUP BY`.
+- **Transactions:** Uses `conn.commit()` and `conn.rollback()` to keep order, item, and payment records consistent.
+- **Batch insertions:** Uses `cursor.executemany()` to insert all items for an order in a single operation.
+- **CSV export:** Uses Python's `csv` and `os` modules to write query results into the `reports/` folder.
+- **Unit testing with mocks:** Uses `pytest`, `monkeypatch`, `capsys`, and `unittest.mock.MagicMock` to test CLI flows and edge cases.
 
 ---
 
-## 🛣️ Future Improvements
+## Future Improvements
 
-Planned enhancements include:
-
-- Detailed order lookup by order ID
-- Order-status management
-- More comprehensive input validation and error handling
-- Sales summaries and revenue reports
-- Popular-item and customer analytics
-- Improved automated testing
-- A graphical interface or web-based dashboard
-- Integration with a verified payment gateway
-
----
-
-## 📌 Project Status
-
-This project is actively being developed as a learning project using Python and MySQL.
-
-The current implementation supports customer selection and registration, order creation, database persistence, payment-status tracking through a simulated workflow, receipt generation, and order-history retrieval.
-
-The long-term goal is to extend it into a more complete restaurant operations and analytics system.
+- Menu management (add, update, or remove dishes from the CLI)
+- Bulk menu import from CSV
+- Date-range filtering for sales analytics
+- Web dashboard or GUI interface
