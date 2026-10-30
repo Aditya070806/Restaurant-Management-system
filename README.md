@@ -1,5 +1,9 @@
 # Restaurant Management System
 
+![Tests](https://github.com/Aditya070806/Restaurant-Management-system/actions/workflows/pytest.yml/badge.svg)
+
+A modular, command-line Restaurant Management System...
+
 A modular, command-line Restaurant Management System built with **Python and MySQL**. The application handles customer registration, order creation, payment status tracking, order history lookup, itemized receipt retrieval, and sales analytics with CSV export.
 
 It covers practical Python development alongside relational database design, multi-table SQL joins (`INNER JOIN`, `LEFT JOIN`), SQL aggregations (`SUM`, `COUNT`, `AVG`, `GROUP BY`), database transactions (`COMMIT` / `ROLLBACK`), file I/O (`csv`), and unit testing (`pytest` + `unittest.mock`).
