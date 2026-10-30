@@ -2,6 +2,33 @@ import mysql.connector
 import csv
 import os
 
+
+def main(conn):
+    cursor = conn.cursor()
+    try:
+        while True:
+            print("\n========== ANALYTICS & REPORTS ==========")
+            print("1. Daily Sales Report\n2. Top 5 Best-Selling Items\n3. Top 5 VIP Customers\n4. Back to Main Menu")
+            try:
+                opt = int(input("Enter a option: "))
+                if opt == 1:
+                    daily_sales(cursor)
+                elif opt == 2:
+                    top_selling_item(cursor)
+                elif opt == 3:
+                    top_customer(cursor)
+                elif opt == 4:
+                    break
+                else:
+                    print("Enter a given option")
+            except ValueError:
+                print("Enter a valid option")
+    except mysql.connector.Error as err:
+        print(f"Database Error: {err}")
+    finally:
+        cursor.close()
+
+
 def daily_sales(cursor):
     cursor.execute("""
                 SELECT 
@@ -134,28 +161,5 @@ def export_csv(filename,header,rows):
         else:
             print("Enter a valid response")
 
-def main(conn):
-    cursor = conn.cursor()
-    try:
-        while True:
-            print("\n========== ANALYTICS & REPORTS ==========")
-            print("1. Daily Sales Report\n2. Top 5 Best-Selling Items\n3. Top 5 VIP Customers\n4. Back to Main Menu")
-            try:
-                opt = int(input("Enter a option: "))
-                if opt == 1:
-                    daily_sales(cursor)
-                elif opt == 2:
-                    top_selling_item(cursor)
-                elif opt == 3:
-                    top_customer(cursor)
-                elif opt == 4:
-                    break
-                else:
-                    print("Enter a given option")
-            except ValueError:
-                print("Enter a valid option")
-    except mysql.connector.Error as err:
-        print(f"Database Error: {err}")
-    finally:
-        cursor.close()
+
 
