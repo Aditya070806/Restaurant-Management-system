@@ -1,4 +1,6 @@
 import mysql.connector
+import csv
+import os
 
 def daily_sales(cursor):
     cursor.execute("""
@@ -9,7 +11,7 @@ def daily_sales(cursor):
                     AVG(o.Total_amount) AS Average
                 FROM Orders AS o
                 INNER JOIN Payments AS p
-                    ON o.Order_id=p.p.Order_id
+                    ON o.Order_id=p.Order_id
                 WHERE p.Payment_status = 'Paid'
                 GROUP BY DATE(Order_date)
                 ORDER BY DATE(Order_date) DESC"""
@@ -35,6 +37,7 @@ def daily_sales(cursor):
             f"₹{Average:>14.2f}"
         )
     print("=" * 65 + "\n")
+    export_csv("daily_sales.csv",["DATE","Total_order","Total","Average"],row)
 
 def top_selling_item(cursor):
     cursor.execute("""
@@ -73,6 +76,7 @@ def top_selling_item(cursor):
             f"₹{Total_revenue:>16.2f}"
         )
     print("=" * 65 + "\n")
+    export_csv("top_selling_item.csv",["food_id","food_name","total_quantity","total_revenue"],row)
 
 def top_customer(cursor):
     cursor.execute("""
@@ -111,10 +115,24 @@ def top_customer(cursor):
             f"₹{Total_spend:>14.2f}"
         )
     print("=" * 65 + "\n")
+    export_csv("top_customer.csv",["Customer_id","Customer_name","Total_order","Total_spend"],row)
 
-def get_sales(cursor):
-    pass
-
+def export_csv(filename,header,rows):
+    while True:
+        choice = input("Export this report to CSV? (y/n): ").strip().lower()
+        if choice =="y":
+            os.makedirs("reports", exist_ok=True)
+            filepath = os.path.join("reports",filename)
+            with open(filepath, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(header) 
+                writer.writerows(rows)
+                print(f"File exported to {filepath}")
+                return
+        elif choice == "n":
+           break
+        else:
+            print("Enter a valid response")
 
 def main(conn):
     cursor = conn.cursor()

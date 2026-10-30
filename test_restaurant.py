@@ -254,7 +254,7 @@ def test_analytics_reports(mock_db, monkeypatch, capsys):
         [(1, "Aditya", 5, 1250.00)]
     ]
 
-    inputs = iter(["1", "2", "3", "4"])
+    inputs = iter(["1", "n", "2", "n", "3", "n", "4"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     analytics.main(conn)
@@ -308,3 +308,14 @@ def test_analytics_db_error(mock_db, monkeypatch, capsys):
 
     assert "Database Error: Connection lost" in captured.out
     cursor.close.assert_called_once()
+
+def test_export_csv(monkeypatch, capsys):
+    inputs = iter(["invalid", "y"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+    analytics.export_csv("test_report.csv", ["ID", "Name"], [(1, "Pizza")])
+    captured = capsys.readouterr()
+
+    assert "Enter a valid response" in captured.out
+    assert "File exported to" in captured.out
+    
